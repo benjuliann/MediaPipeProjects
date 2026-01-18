@@ -20,7 +20,13 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 # Initialize HandLandmarker
 base_options = python.BaseOptions(model_asset_path='hand_landmarker.task')
-options = vision.HandLandmarkerOptions(base_options=base_options)
+options = vision.HandLandmarkerOptions(
+    base_options=base_options,
+    num_hands=2,
+    min_hand_detection_confidence=0.5,
+    min_hand_presence_confidence=0.5,
+    min_tracking_confidence=0.5
+)
 landmarker = vision.HandLandmarker.create_from_options(options)
 
 pTime = 0
@@ -42,7 +48,11 @@ while True:
     results = landmarker.detect(mp_image)
 
     if results.hand_landmarks:
-        for hand_landmarks in results.hand_landmarks:
+        for idx, hand_landmarks in enumerate(results.hand_landmarks):
+            # Get handedness (Left or Right) - reverse it because camera is flipped
+            hand_label = results.handedness[idx][0].category_name
+            hand_label = "Left" if hand_label == "Right" else "Right"
+
             # Draw connections
             for start_idx, end_idx in HAND_CONNECTIONS:
                 start = hand_landmarks[start_idx]
@@ -54,19 +64,27 @@ while True:
             # Draw landmarks and highlight fingertips
             for id, lm in enumerate(hand_landmarks):
                 cx, cy = int(lm.x * w), int(lm.y * h)
-                # Pink circles on fingertips
+                # Circles on fingertips
                 if id in [4, 8, 12, 16, 20]:
                     cv2.circle(img, (cx, cy), 10, (238, 108, 44), cv2.FILLED)
                 else:
                     cv2.circle(img, (cx, cy), 5, (0, 0, 255), cv2.FILLED)
-                # Optional: print coordinates
-                # print(id, cx, cy)
+                    
+            # Display hand label
+            x_pos = int(hand_landmarks[0].x * w)
+            y_pos = int(hand_landmarks[0].y * h) - 20
+            cv2.putText(img, hand_label, (x_pos, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+            
+            # display hand position
+            text_y = 90 + (idx * 30)
+            cv2.putText(img, f'{hand_label} hand: {int(x_pos)}, {int(y_pos)}', (10, text_y), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            # cv2.putText(img, f'{int(id)}, {int(cx)}, {int(cy)}', (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     # FPS calculation
     cTime = time.time()
     fps = 1 / (cTime - pTime)
     pTime = cTime
-    cv2.putText(img, 'fps: ' + str(int(fps)), (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
+    cv2.putText(img, f'fps: {int(fps)}', (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7,
                 (255, 255, 255), 2)
 
     cv2.imshow("Image", img)
